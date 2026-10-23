@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Outing Fit</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+:root{
+  --bg:#1b1e2b;--surface:#232737;--raise:#2a2f41;--fg:#ebebf0;--muted:#9a9eb0;--faint:#6c7186;--line:#30364a;
+  --mcp:#d4a284;--mcp-soft:rgba(212,162,132,.12);--great:#d4a284;--good:#7fb8de;--poor:#e0605a;--warn:#e3a857;
+  --font:"Noto Sans Bengali","Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;overflow-x:hidden;background:var(--bg);color:var(--fg);font:14px/1.45 var(--font)}
+.wrap{padding:14px;display:grid;gap:12px}
+.empty{color:var(--muted);padding:28px;text-align:center}
+.bar{display:flex;align-items:center;gap:10px;font:12px var(--mono);color:var(--muted);min-width:0}
+.bar .q{color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.bar .t{font-variant-numeric:tabular-nums;color:var(--mcp)}
+.pulse{width:8px;height:8px;border-radius:50%;background:var(--mcp);flex:none;box-shadow:0 0 0 0 var(--mcp);animation:ping 1.4s infinite}
+@keyframes ping{0%{box-shadow:0 0 0 0 rgba(212,162,132,.6)}100%{box-shadow:0 0 0 10px rgba(212,162,132,0)}}
+.map{height:230px;border-radius:3px;border:1px solid var(--line);overflow:hidden;background:#0b1316}
+.map.small{height:170px}
+.leaflet-container{background:#0b1316;font:inherit}
+.leaflet-control-attribution{background:rgba(10,16,19,.7)!important;color:var(--muted)!important;font-size:10px!important}
+.leaflet-control-attribution a{color:var(--muted)!important}
+.leaflet-bar{border:1px solid rgba(160,210,200,.18)!important;border-radius:8px!important;overflow:hidden;box-shadow:none!important}
+.leaflet-bar a{width:28px!important;height:28px!important;line-height:26px!important;background:rgba(10,16,19,.85)!important;color:var(--fg,#e3eeeb)!important;border-bottom:1px solid rgba(160,210,200,.14)!important;font:500 16px/26px system-ui,sans-serif!important}
+.leaflet-bar a:last-child{border-bottom:0!important}
+.leaflet-bar a:hover{background:rgba(24,46,50,.95)!important;color:#e8d3a2!important}
+.leaflet-bar a.leaflet-disabled{color:rgba(227,238,235,.3)!important}
+.pin{width:12px;height:12px;border-radius:50%;background:var(--muted);border:2px solid var(--bg);box-shadow:0 0 0 1px var(--muted);transition:transform .3s,background .3s;animation:drop .45s ease-out}
+.pin.ok{background:var(--mcp);box-shadow:0 0 0 1px var(--mcp)}
+.pin.limited{background:var(--warn);box-shadow:0 0 0 1px var(--warn)}
+.pin.no{background:var(--poor);box-shadow:0 0 0 1px var(--poor)}
+@keyframes drop{0%{transform:translateY(-14px) scale(.4);opacity:0}100%{transform:none;opacity:1}}
+.num{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font:700 11px var(--mono);color:var(--bg);border:2px solid var(--bg)}
+.num.great{background:var(--great)}.num.good{background:var(--good)}.num.poor{background:var(--poor)}.num.none{background:var(--muted)}
+.num.sel{transform:scale(1.25);box-shadow:0 0 0 2px var(--fg)}
+.home{width:16px;height:16px;border-radius:4px;background:var(--fg);border:3px solid var(--bg);box-shadow:0 0 0 1px var(--fg)}
+.map.live{height:330px;position:relative}
+.bar .n{color:var(--muted);white-space:nowrap}
+.pin{position:relative}
+.pin.focus{transform:scale(1.35);background:var(--gold);box-shadow:0 0 0 1px var(--gold)}
+.pin .ring{position:absolute;inset:-7px;border-radius:50%;border:1.5px solid var(--gold);animation:ringp 1.1s ease-out infinite}
+@keyframes ringp{from{transform:scale(.6);opacity:1}to{transform:scale(1.6);opacity:0}}
+.pin.wx{animation:wx .6s ease-out}
+@keyframes wx{50%{transform:scale(1.6);background:#6fb6ff;box-shadow:0 0 0 1px #6fb6ff}}
+.leaflet-tooltip.live{background:rgba(10,16,19,.92);border:1px solid rgba(232,211,162,.5);color:var(--fg);font:500 11.5px var(--font);padding:3px 8px;border-radius:999px;box-shadow:none}
+.leaflet-tooltip.live::before{display:none}
+.leaflet-tooltip.live.ok{border-color:var(--mcp);color:var(--mcp)}
+.leaflet-tooltip.live.limited{border-color:var(--warn);color:var(--warn)}
+.leaflet-tooltip.live.no{border-color:var(--poor);color:var(--poor)}
+.ticker{position:absolute;left:10px;top:10px;z-index:500;max-width:calc(100% - 20px);padding:5px 10px;border-radius:999px;background:rgba(10,16,19,.9);border:1px solid var(--line);font:12px var(--mono);color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:opacity .3s,transform .3s}
+.ticker.swap{opacity:0;transform:translateY(-4px)}
+/* The research agent's own sentence: what it found, what it checks next. Stays until the next one. */
+.caption{position:absolute;left:10px;right:10px;bottom:10px;z-index:500;padding:8px 12px;border-radius:10px;background:rgba(10,16,19,.92);border:1px solid var(--line);font:13px/1.4 var(--font, Inter, sans-serif);color:var(--fg);transition:opacity .3s,transform .3s}
+.caption.swap{opacity:0;transform:translateY(4px)}
+@keyframes in{from{opacity:0;transform:translateY(-4px)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.top{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:12px}
+.title{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.title h1{margin:0;font-size:19px;line-height:1.2}
+.title .sub{color:var(--muted);font-size:12.5px;margin-top:3px}
+.title a{color:var(--mcp)}
+.badge{flex:none;font:600 12px var(--mono);padding:4px 10px;border-radius:2px;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;background:rgba(255,255,255,.06)}
+.badge.great{color:#1b1e2b;background:var(--great)}.badge.good{color:var(--good)}.badge.poor{color:var(--poor)}.badge.none{color:var(--muted)}
+.reason{font-size:14px}
+.label{font:500 10.5px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:5px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12.5px;padding:3px 10px;border-radius:2px;background:var(--raise);border:1px solid var(--line)}
+.chip em{font-style:normal;color:var(--muted)}
+.chip.wx{border-color:rgba(111,182,255,.45);color:#cfe1ff}
+.fam{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:10px 12px;border-radius:3px;background:var(--raise);border:0}
+.fam>div:nth-child(2) b{display:block;font-size:14px}
+.fam small{color:var(--muted);font-size:12px}
+.meter{--p:1;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle,var(--surface) 17px,transparent 18px),conic-gradient(var(--mcp) calc(var(--p)*360deg),rgba(212,162,132,.14) 0);position:relative;animation:sweepin .9s cubic-bezier(.2,.8,.2,1)}
+.meter b{position:absolute;inset:0;display:grid;place-items:center;font:700 12px var(--mono);color:var(--fg)}
+@keyframes sweepin{from{transform:rotate(-90deg) scale(.6);opacity:0}}
+.fam.wait{color:var(--muted);font-size:13px}
+.fam.wait .meter{--p:.25;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.stack{display:flex}
+.stack img{width:28px;height:28px;border-radius:50%;object-fit:cover;background:#1d2b30;margin-left:-8px;border:2px solid var(--surface);box-shadow:0 0 0 1.5px var(--mcp)}
+.stack img.no{box-shadow:0 0 0 1.5px var(--warn)}
+.who{display:grid;gap:6px}
+.who .p{display:grid;grid-template-columns:38px 1fr auto;gap:12px;align-items:center;padding:7px 10px;border-radius:3px;background:var(--raise);border:1px solid transparent;animation:rowin .45s cubic-bezier(.2,.8,.2,1) both}
+.who .p.is-no{border-color:rgba(242,184,75,.22)}
+.who img{width:38px;height:38px;border-radius:50%;object-fit:cover;background:#1d2b30;box-shadow:0 0 0 2px var(--surface),0 0 0 3.5px var(--mcp)}
+.who .is-no img{box-shadow:0 0 0 2px var(--surface),0 0 0 3.5px var(--warn)}
+@keyframes rowin{from{opacity:0;transform:translateX(-10px)}}
+.who b{font-size:13.5px;font-weight:600}
+.who small{display:block;color:var(--muted);font-size:12.5px;line-height:1.3}
+.who .ok,.who .no{font:600 11px var(--mono);padding:2px 8px;border-radius:999px;white-space:nowrap}
+.who .ok{color:var(--great);background:var(--mcp-soft)}
+.who .no{color:var(--warn);background:rgba(242,184,75,.12)}
+ul.notes{margin:0;padding:0;list-style:none;display:grid;gap:4px}
+ul.notes li{padding:6px 8px;border-radius:6px;font-size:13px;background:var(--raise);border:1px solid rgba(242,184,75,.25)}
+ul.notes li.b{border-color:var(--poor)}
+ul.notes li.a{border-color:var(--mcp)}
+/* Places are tiles, like the panels of a smart display. A tapped tile opens across the full width. */
+.rank{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));grid-auto-flow:dense;gap:8px}
+.rk{position:relative;background:var(--surface);border:1px solid transparent;border-radius:3px;transition:border-color .2s,transform .2s,background .2s;min-width:0}
+.rk:not(.open):hover{background:var(--raise)}
+.rk.open{grid-column:1/-1;border-color:transparent;border-top:2px solid var(--mcp);background:var(--surface)}
+.rk>button{all:unset;box-sizing:border-box;width:100%;display:grid;grid-template-columns:auto 1fr;grid-template-areas:"k b" "n n" "w w";gap:6px 8px;align-items:center;padding:12px 12px 13px;cursor:pointer;min-height:118px;align-content:start}
+.rk>button:focus-visible{outline:2px solid var(--mcp);outline-offset:2px;border-radius:3px}
+.rk>button:hover .n{color:#fff}
+.rk .k{grid-area:k;font:700 12px var(--mono);color:var(--faint)}
+.rk.open .k{color:var(--mcp)}
+.rk .badge{grid-area:b;justify-self:end}
+.rk .n{grid-area:n;font-weight:600;font-size:14.5px;line-height:1.25;min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.rk .why{grid-area:w;color:var(--muted);font-size:12.5px;line-height:1.35;min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.rk.open>button{min-height:0;grid-template-columns:auto 1fr auto;grid-template-areas:"k n b" "w w w"}
+.rk.open .n{font-size:16px;-webkit-line-clamp:3}
+.rk.open .why{color:var(--fg);font-size:13.5px;display:block}
+.back{all:unset;box-sizing:border-box;grid-column:1/-1;justify-self:start;display:inline-flex;align-items:center;gap:8px;padding:7px 14px 7px 11px;border-radius:3px;background:var(--surface);font:600 13px var(--font, Inter, sans-serif);color:var(--fg);cursor:pointer;animation:open .25s ease-out}
+.back:hover{border-color:rgba(212,162,132,.45)}
+.back:focus-visible{outline:2px solid var(--mcp);outline-offset:2px}
+.back span{color:var(--mcp);font-size:15px;line-height:1}
+.rk .body{display:grid;gap:10px;padding:0 12px 12px;animation:open .3s ease-out}
+.rk .sub{color:var(--muted);font-size:12.5px}
+.rk .sub a{color:var(--mcp)}
+.tell.off{opacity:0;transition:opacity .4s}
+.tell{display:inline-flex;align-items:center;gap:6px;font:600 11px var(--mono);color:var(--mcp);letter-spacing:.06em}
+.tell i{display:inline-flex;gap:2px;align-items:flex-end;height:10px}
+.tell i b{width:2px;background:var(--mcp);animation:eq .9s ease-in-out infinite}
+.tell i b:nth-child(2){animation-delay:-.3s}.tell i b:nth-child(3){animation-delay:-.6s}
+@keyframes eq{0%,100%{height:3px}50%{height:10px}}
+@keyframes open{from{opacity:0;transform:translateY(-4px)}}
+.rk .badge{font-size:10.5px;padding:3px 8px}
+@media (max-width:420px){.rk .body{padding-left:12px}}
+button:focus-visible,.rk>button:focus-visible{outline:2px solid var(--mcp);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="empty">Waiting for the tool call…</div></div>
+<script>
+// MCP Apps view: JSON-RPC over postMessage with the host.
+// While the tool runs, the host forwards each MCP progress notification (ui/notifications/tool-progress),
+// so the card draws the search live; the final tool-result turns it into the ranked answer.
+let nextId = 1;
+const pending = new Map();
+function send(msg) { window.parent.postMessage({ jsonrpc: "2.0", ...msg }, "*"); }
+function request(method, params) {
+  const id = nextId++;
+  send({ id, method, params });
+  return new Promise((resolve, reject) => pending.set(id, { resolve, reject }));
+}
+window.addEventListener("message", (e) => {
+  const m = e.data;
+  if (!m || m.jsonrpc !== "2.0") return;
+  if (m.id != null && pending.has(m.id)) {
+    const p = pending.get(m.id); pending.delete(m.id);
+    m.error ? p.reject(new Error(m.error.message)) : p.resolve(m.result);
+  } else if (m.method === "ui/notifications/tool-input") startLive(m.params?.arguments ?? {});
+  else if (m.method === "ui/notifications/tool-progress") onStep(m.params);
+  else if (m.method === "ui/notifications/tool-result") {
+    if (m.params?.structuredContent) { plan = m.params.structuredContent; sel = -1; focused = false; renderPlan(); }
+  }
+});
+
+const $ = (tag, cls, text) => { const el = document.createElement(tag); if (cls) el.className = cls; if (text != null) el.textContent = text; return el; };
+const hourLabel = (h) => `${((h + 11) % 12) + 1}${h < 12 ? "a" : "p"}`;
+const app = document.getElementById("app");
+
+// ---- Map ----
+let map = null, layer = null;
+function makeMap(cls) {
+  const el = $("div", "map " + cls);
+  if (!window.L) { el.textContent = ""; return el; }
+  requestAnimationFrame(() => {
+    map?.remove();
+    map = L.map(el, { zoomControl: false, attributionControl: true, scrollWheelZoom: false });
+    L.control.zoom({ position: "topright", zoomInTitle: "Zoom in", zoomOutTitle: "Zoom out" }).addTo(map);
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}", {
+      maxZoom: 16, attribution: "Esri, HERE, Garmin, © OpenStreetMap",
+    }).addTo(map);
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}", { maxZoom: 16, opacity: .7 }).addTo(map);
+    layer = L.layerGroup().addTo(map);
+    map.setView(home ? [home.lat, home.lon] : [37.8, -122.27], 9);
+    setTimeout(() => { map.invalidateSize(); if (plan) drawMap(); else { markers.clear(); setHome(); if (places.size) dropPins(); } }, 50);
+  });
+  return el;
+}
+const icon = (cls, html = "") => L.divIcon({ className: "", html: `<div class="${cls}">${html}</div>`, iconSize: [22, 22], iconAnchor: [11, 11] });
+
+// ---- Live research ----
+// No step list: every progress notification becomes something happening on the map.
+// Pins drop in as places are found, pulse while the agent researches them, and take their access colour when it knows.
+let live = null, home = null, places = new Map(), steps = [], t0 = 0, timer = null, markers = new Map(), radar = null;
+function startLive(args) {
+  if (plan) return;
+  t0 = Date.now();
+  live = args;
+  const bar = $("div", "bar");
+  const what = args.place || args.what || args.request || "Finding places";
+  bar.append($("span", "pulse"), $("span", "q", what), $("span", "n", ""), $("span", "t", "0.0s"));
+  const m = makeMap("live");
+  app.replaceChildren(bar, m);
+  clearInterval(timer);
+  timer = setInterval(() => { const t = app.querySelector(".bar .t"); if (t) t.textContent = ((Date.now() - t0) / 1000).toFixed(1) + "s"; }, 100);
+  resize();
+}
+function ticker(text) {
+  const t = app.querySelector(".ticker"); if (!t) return;
+  t.classList.add("swap");
+  setTimeout(() => { t.textContent = text; t.classList.remove("swap"); }, 180);
+}
+function caption(text) {
+  const c = app.querySelector(".caption"); if (!c) return;
+  c.classList.add("swap");
+  setTimeout(() => { c.textContent = text; c.classList.remove("swap"); }, 200);
+}
+function counts() {
+  const n = app.querySelector(".bar .n"); if (!n) return;
+  const checked = [...places.values()].filter((p) => p.access).length;
+  n.textContent = places.size ? `${places.size} places${checked ? ` · ${checked} checked` : ""}` : "";
+}
+const words = (s) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(" ").filter((w) => w.length > 4 && !["park", "museum", "center", "garden", "gardens", "national", "state", "california", "family"].includes(w));
+const mentions = (p, text) => { const t = text.toLowerCase().replace(/[^a-z0-9]/g, ""); return words(p.name).some((w) => t.includes(w)); };
+const ACCESS = { yes: ["ok", "step-free"], limited: ["limited", "limited access"], no: ["no", "not accessible"], unknown: ["", "unclear"] };
+
+function onStep({ message, step, at }) {
+  if (!step && /^Finding home/.test(message)) return;
+  const s = { message, step: step ?? (/^\d/.test(message) ? { kind: "found" } : {}), at: at ?? Date.now() - t0 };
+  steps.push(s);
+  const k = s.step.kind, d = s.step;
+  if (k === "home") home = d;
+  if (k === "places") for (const p of d.places) if (!places.has(p.id)) places.set(p.id, { ...p, access: null, focus: null });
+  if (k === "access" && places.has(d.id)) Object.assign(places.get(d.id), { access: d.status, focus: null });
+  if (!live || plan || !map) return;
+  if (k === "home") { setHome(); ticker(`Home · ${d.label}`); }
+  else if (k === "search") { ticker(`${d.source} · ${d.query}`); if (d.radiusKm) sweep(d.radiusKm); }
+  else if (k === "places") { dropPins(); ticker(`Forecast and alerts · ${d.places.length} places`); }
+  else if (k === "web") {
+    ticker(`Web · ${d.queries.length} searches`);
+    for (const p of places.values()) if (!p.access && d.queries.some((q) => mentions(p, q))) focus(p, "searching");
+  } else if (k === "read") {
+    ticker(`Reading · ${d.hosts.join(", ")}`);
+    for (const p of places.values()) { const h = d.hosts.find((h) => mentions(p, h)); if (h) focus(p, h); }
+  } else if (k === "access" && places.has(d.id)) settle(places.get(d.id));
+  else if (k === "think") ticker(d.text);
+  else if (k === "say") {
+    caption(d.text);
+    for (const p of places.values()) if (!p.access && mentions(p, d.text)) focus(p, "checking");
+  }
+  else if (k === "rank") { ticker(message); rankPins(d.ranking); }
+  counts();
+}
+function setHome() {
+  if (!home) return;
+  L.marker([home.lat, home.lon], { icon: icon("home"), zIndexOffset: 1000 }).addTo(layer);
+  map.setView([home.lat, home.lon], 10, { animate: true });
+}
+function sweep(km) {
+  if (!home) return;
+  radar?.remove();
+  radar = L.circle([home.lat, home.lon], { radius: 1, color: "#d4a284", weight: 1, opacity: .6, fillOpacity: .05, dashArray: "4 6" }).addTo(layer);
+  map.flyToBounds(L.latLng(home.lat, home.lon).toBounds(km * 2000), { duration: .8 });
+  const start = performance.now();
+  const step = (now) => { const k = Math.min(1, (now - start) / 1200); radar.setRadius(km * 1000 * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+function pinIcon(p) {
+  const cls = "pin" + (p.focus ? " focus" : p.access ? " " + ACCESS[p.access][0] : "");
+  return L.divIcon({ className: "", html: `<div class="${cls}">${p.focus ? '<i class="ring"></i>' : ""}</div>`, iconSize: [12, 12], iconAnchor: [6, 6] });
+}
+function dropPins() {
+  let i = 0;
+  for (const p of places.values()) {
+    if (markers.has(p.id)) continue;
+    const m = L.marker([p.lat, p.lon], { icon: pinIcon(p) });
+    markers.set(p.id, m);
+    setTimeout(() => {
+      m.addTo(layer);
+      // A quick blue flash per pin while the forecast for it comes in.
+      setTimeout(() => m.getElement()?.firstChild?.classList.add("wx"), 500 + Math.random() * 600);
+    }, i++ * 110);
+  }
+  const pts = [...places.values()].map((p) => [p.lat, p.lon]);
+  if (home) pts.push([home.lat, home.lon]);
+  if (pts.length > 1) setTimeout(() => map.flyToBounds(pts, { padding: [28, 28], maxZoom: 12, duration: .8 }), 300);
+}
+// One label on the map at a time; focused pins keep their ring and take turns.
+let labeled = null, rotor = null;
+function label(p, text, cls = "") {
+  const m = markers.get(p.id); if (!m) return;
+  if (text && labeled && labeled !== p) markers.get(labeled.id)?.unbindTooltip();
+  m.unbindTooltip();
+  labeled = text ? p : labeled === p ? null : labeled;
+  if (text) m.bindTooltip(`${p.name.length > 26 ? p.name.slice(0, 25) + "…" : p.name} · ${text}`, { permanent: true, direction: "top", offset: [0, -8], className: "live " + cls }).openTooltip();
+}
+function focus(p, text) {
+  p.focus = text;
+  markers.get(p.id)?.setIcon(pinIcon(p));
+  label(p, text);
+  clearInterval(rotor);
+  rotor = setInterval(() => {
+    const busy = [...places.values()].filter((q) => q.focus && !q.access);
+    if (!busy.length) return clearInterval(rotor);
+    const q = busy[(busy.indexOf(labeled) + 1) % busy.length];
+    if (q !== labeled) label(q, q.focus);
+  }, 1400);
+}
+function settle(p) {
+  const m = markers.get(p.id); if (!m) return;
+  m.setIcon(pinIcon(p));
+  const [cls, text] = ACCESS[p.access] || ["", p.access];
+  label(p, text, cls);
+  setTimeout(() => { if (!p.focus) label(p, null); }, 2200);
+}
+function rankPins(ranking) {
+  clearInterval(rotor);
+  ranking.forEach((r, i) => {
+    const m = markers.get(r.id); if (!m) return;
+    label(places.get(r.id), null);
+    setTimeout(() => m.setIcon(icon("num " + r.level, String(i + 1))), i * 160);
+  });
+  for (const [id, m] of markers) if (!ranking.some((r) => r.id === id)) m.setOpacity(.3);
+}
+
+function drawMap() {
+  if (!map || !layer) return;
+  layer.clearLayers();
+  const pts = [];
+  if (home) {
+    L.marker([home.lat, home.lon], { icon: icon("home"), zIndexOffset: 1000 }).addTo(layer);
+    pts.push([home.lat, home.lon]);
+    const search = [...steps].reverse().find((s) => s.step.radiusKm);
+    if (search && !plan) L.circle([home.lat, home.lon], { radius: search.step.radiusKm * 1000, color: "#d4a284", weight: 1, opacity: .5, fillOpacity: .04, dashArray: "4 6" }).addTo(layer);
+  }
+  const list = plan ? plan.candidates.map((c, i) => ({ id: c.place.id, name: c.place.name, lat: c.place.lat, lon: c.place.lon, rank: i, level: c.fit?.level || "none" })) : [...places.values()];
+  for (const p of list) {
+    const m = p.rank != null
+      ? L.marker([p.lat, p.lon], { icon: icon("num " + p.level + (p.rank === sel ? " sel" : ""), String(p.rank + 1)), zIndexOffset: 500 - p.rank })
+      : L.marker([p.lat, p.lon], { icon: icon("pin" + (p.access === "yes" ? " ok" : p.access ? " " + p.access : "")) });
+    m.bindTooltip(p.name, { direction: "top", offset: [0, -8] });
+    if (p.rank != null) m.on("click", () => tellAbout(p.rank));
+    m.addTo(layer);
+    pts.push([p.lat, p.lon]);
+  }
+  const c = plan?.candidates[sel];
+  if (focused && c && home) map.flyToBounds([[home.lat, home.lon], [c.place.lat, c.place.lon]], { padding: [44, 44], maxZoom: 13, duration: .8 });
+  else if (pts.length > 1) map.fitBounds(pts, { padding: [24, 24], maxZoom: 12, animate: !plan });
+  else if (pts.length === 1) map.setView(pts[0], 10);
+}
+
+// ---- Result ----
+// Every ranked place is a card. Tapping one opens it, flies the map there and has the research agent tell about it.
+let plan = null, sel = -1, telling = -1, focused = false;
+function renderPlan() {
+  clearInterval(timer);
+  live = null;
+  if (!home && plan.homeAt) home = { ...plan.homeAt, label: plan.home };
+  app.replaceChildren();
+  if (!plan.candidates.length) { app.append($("div", "empty", plan.spoken)); return resize(); }
+  const d = new Date(plan.date + "T12:00:00");
+  const bar = $("div", "bar");
+  bar.append($("span", "q", `${d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} · ${hourLabel(plan.startHour)}, ${plan.durationH}h · from ${plan.home}`));
+  if (steps.length) bar.append($("span", "t", `${(steps.at(-1).at / 1000).toFixed(1)}s`));
+  const rank = $("div", "rank");
+  rank.append(...rankItems());
+  app.append(bar, makeMap("small"), rank);
+  resize();
+}
+// A tap only swaps the cards and redraws the map layer, so the map glides instead of reloading.
+function refresh() {
+  const rank = app.querySelector(".rank");
+  if (!rank) return renderPlan();
+  rank.replaceChildren(...rankItems());
+  drawMap();
+  resize();
+}
+
+// An open place has the card to itself; a back button returns to all the tiles.
+function rankItems() {
+  if (sel < 0) return plan.candidates.map((c, i) => placeCard(c, i));
+  const back = $("button", "back", "All places");
+  back.prepend($("span", null, "←"));
+  back.onclick = () => { sel = -1; telling = -1; focused = false; refresh(); app.querySelector(".map")?.scrollIntoView({ behavior: "smooth", block: "start" }); };
+  return [back, placeCard(plan.candidates[sel], sel)];
+}
+
+function tellAbout(i) {
+  sel = i; telling = i; focused = true; refresh();
+  app.querySelector(".map")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const done = () => { if (telling !== i) return; telling = -1; document.querySelector(".tell")?.classList.add("off"); };
+  tell(i, true).then(() => setTimeout(done, 9000), done);
+}
+
+// The research agent judges the place for each person from what it already read, and says it out loud when asked to;
+// the device speaks the answer while the map flies there. No new searching, so it comes back in about a second.
+async function tell(i, speak) {
+  const c = plan.candidates[i];
+  const timeout = new Promise((ok) => setTimeout(ok, 20000, null)); // never leave the card spinning
+  const r = await Promise.race([request("tools/call", { name: "tell_about_place", arguments: { place: c.place.id, speak } }), timeout]).catch(() => null);
+  c.told = r?.structuredContent?.members?.length ? r.structuredContent : { members: [], failed: true };
+  const open = app.querySelector(".rk.open");
+  if (open && sel === i) { open.querySelector(".body")?.replaceWith(details(c, i)); resize(); }
+}
+
+function badge(c) {
+  return $("span", "badge " + (c.fit?.level || "none"), c.fit?.level || "not judged");
+}
+
+function placeCard(c, i) {
+  const card = $("div", "rk" + (i === sel ? " open" : ""));
+  const head = $("button");
+  head.setAttribute("aria-expanded", String(i === sel));
+  head.append($("span", "k", String(i + 1)), $("span", "n", c.place.name), badge(c));
+  if (c.fit?.reason) head.append($("span", "why", c.fit.reason));
+  head.onclick = () => tellAbout(i);
+  card.append(head);
+  if (i === sel) card.append(details(c, i));
+  return card;
+}
+
+const hoursToday = (c) => { try { return JSON.parse(c.place.extra?.hours)[new Date(plan.date + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" })]; } catch { return undefined; } };
+
+// Weather stays the agent's input; the card only shows it when it changes the plan.
+function weatherChip(c) {
+  const v = (c.weather ?? []).filter((w) => w.hour >= plan.startHour && w.hour < plan.startHour + plan.durationH);
+  if (!v.length || c.place.indoor) return null;
+  const wet = v.find((w) => w.rainPct >= 40), hot = Math.max(...v.map((w) => w.feelsF)), cold = Math.min(...v.map((w) => w.feelsF));
+  if (wet) return `Rain ${wet.rainPct}% from ${hourLabel(wet.hour)}`;
+  if (hot >= 85) return `Hot, feels ${hot}°F`;
+  if (cold <= 45) return `Cold, feels ${cold}°F`;
+  return null;
+}
+
+function avatar(name) {
+  const person = (plan.members ?? []).find((p) => p.name.toLowerCase() === name.toLowerCase());
+  const img = $("img"); img.alt = ""; img.src = `/avatars/${person?.kind || "adult"}.png`;
+  img.onerror = () => { img.style.visibility = "hidden"; };
+  return img;
+}
+
+function details(c, i) {
+  const body = $("div", "body");
+  const sub = $("div", "sub", `${(c.place.extra?.category || c.place.kind).replace(/_/g, " ").toLowerCase()} · ${c.driveMin ?? "?"} min drive · ${c.place.indoor ? "indoors" : "outdoors"}`);
+  if (c.place.url) { const a = $("a", null, "website"); a.href = c.place.url; a.onclick = (e) => { e.preventDefault(); request("ui/open-link", { url: c.place.url }).catch(() => {}); }; sub.append(" · ", a); }
+  body.append(sub);
+  if (telling === i) { const t = $("span", "tell"); const eq = $("i"); eq.append($("b"), $("b"), $("b")); t.append(eq, "TELLING YOU ABOUT IT"); body.append(t); }
+
+  const chips = $("div", "chips");
+  const chip = (k, v, cls = "") => { const x = $("span", "chip " + cls, k); if (v) x.append(" ", $("em", null, v)); chips.append(x); };
+  chip("Arrive", hourLabel(c.fit?.bestArrivalHour ?? plan.startHour).replace(/([ap])$/, " $1m").toUpperCase());
+  const h = hoursToday(c); if (h) chip(h === "Closed" ? "Closed today" : "Open", h === "Closed" ? "" : h);
+  const wx = weatherChip(c); if (wx) chip(wx, "", "wx");
+  body.append(chips);
+
+  const ms = c.told?.members ?? [];
+  if (c.told?.failed) {
+    // Nothing to show per person; the notes below still hold what the research found.
+  } else if (!ms.length) {
+    const wait = $("div", "fam wait");
+    wait.append($("div", "meter"), $("div", null, "Checking it for each of you"));
+    body.append(wait);
+  } else {
+    const fits = ms.filter((m) => m.ok).length;
+    const sum = $("div", "fam");
+    const stack = $("div", "stack");
+    ms.forEach((m) => { const img = avatar(m.name); img.className = m.ok ? "ok" : "no"; stack.append(img); });
+    const ring = $("div", "meter"); ring.style.setProperty("--p", fits / ms.length);
+    ring.append($("b", null, `${fits}/${ms.length}`));
+    const txt = $("div"); txt.append($("b", null, fits === ms.length ? "Works for everyone" : `${ms.length - fits} ${ms.length - fits === 1 ? "needs" : "need"} a plan`), $("small", null, fits === ms.length ? "Checked for each of you" : "Here is what to sort out"));
+    sum.append(ring, txt, stack);
+    body.append(sum);
+    const who = $("div", "who");
+    ms.forEach((m, k) => {
+      const row = $("div", "p " + (m.ok ? "is-ok" : "is-no"));
+      row.style.animationDelay = `${120 + k * 140}ms`;
+      const img = avatar(m.name);
+      const t = $("div"); t.append($("b", null, m.name), $("small", null, m.note));
+      row.append(img, t, $("span", m.ok ? "ok" : "no", m.ok ? "fits" : (m.tag || "heads up")));
+      who.append(row);
+    });
+    body.append(who);
+  }
+
+  const notes = $("ul", "notes");
+  for (const a of c.weatherAlerts ?? []) notes.append($("li", "b", a));
+  for (const a of c.parkAlerts ?? []) notes.append($("li", null, a.title));
+  if (c.memory) notes.append($("li", c.memory.rating > 2 ? "a" : null, `You rated it ${c.memory.rating}/5 after your trip on ${c.memory.date}: ${c.memory.summary}`));
+  for (const m of c.memory?.member_notes ?? []) notes.append($("li", null, `Last time, ${m.name}: ${m.note}`));
+  if (c.note) notes.append($("li", "a", c.note));
+  if (notes.children.length) body.append(notes);
+  return body;
+}
+
+function resize() {
+  requestAnimationFrame(() => send({ method: "ui/notifications/size-changed", params: { width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight } }));
+}
+
+request("ui/initialize", { protocolVersion: "2026-01-26", appInfo: { name: "outing-fit-card", version: "0.2.0" }, appCapabilities: {} })
+  .then(() => send({ method: "ui/notifications/initialized", params: {} }))
+  .catch(() => {});
+</script>
+</body>
+</html>
