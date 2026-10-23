@@ -1,4 +1,4 @@
-# Outing Fit
+# Fit Trip MCP
 
 A voice assistant skill that answers one question families ask every weekend: **"Where can we go that works for all of us?"**
 
@@ -10,7 +10,7 @@ Tell it who lives at home (a grandparent in a wheelchair, a four-year-old who na
 ## How it works
 
 ```
- voice ─► device agent (pi agent + MCP client) ──MCP──► Outing Fit server
+ voice ─► device agent (pi agent + MCP client) ──MCP──► Fit Trip server
                  ▲                                         │
                  │                              research agent (pi agent)
           MCP App card  ◄──────────────────────  web search · page reads · forecast

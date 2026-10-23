@@ -57,7 +57,7 @@ function planResult(plan: Plan) {
   };
 }
 
-const INSTRUCTIONS = `Outing Fit plans family day trips and remembers how past trips went.
+const INSTRUCTIONS = `Fit Trip plans family day trips and remembers how past trips went.
 At the start of every conversation call get_outing_memory once. If it lists pending_reviews, first ask the user one short
 question about the most recent of those trips (how it went, and how it was for anyone with special needs), save the answer
 with save_visit_review, then carry on with what the user asked. If the answer is only a word or two ("it was good") and says nothing
@@ -67,7 +67,7 @@ Ask at most that one follow-up. If the user does not want to talk about it, move
 When the family decides to go somewhere, log it with log_visit so you can ask about it next time.`;
 
 function buildServer(household: string) {
-  const server = new McpServer({ name: "outing-fit", version: "0.1.0" }, { instructions: INSTRUCTIONS });
+  const server = new McpServer({ name: "fit-trip", version: "0.1.0" }, { instructions: INSTRUCTIONS });
 
   server.registerResource("outing-card", CARD_URI, { mimeType: CARD_MIME, description: "Outing results card" }, async () => ({
     contents: [{ uri: CARD_URI, mimeType: CARD_MIME, text: await readFile(new URL("card.html", PUBLIC), "utf8") }],
@@ -446,5 +446,5 @@ app.post("/api/tts", async (req, res) => {
 app.get("/health", (_req, res) => res.json({ ok: true }));
 app.use(express.static(PUBLIC.pathname));
 
-app.listen(port, () => console.log(`Outing Fit on http://localhost:${port} (MCP at /mcp)`));
+app.listen(port, () => console.log(`Fit Trip on http://localhost:${port} (MCP at /mcp)`));
 if (process.env.WARM_CACHES !== "0") keepWarm();

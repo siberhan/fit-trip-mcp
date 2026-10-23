@@ -1,4 +1,4 @@
-# Outing Fit
+# Fit Trip
 
 ## What it is
 A voice-assistant skill, served as a self-hosted MCP server, that tells a family whether a day out works for every member: who is coming (ages, wheelchair, stroller, heat or cold sensitivity, low stamina), the hourly forecast at the place, weather and park alerts, drive time from home, and how past trips went. A research agent on the server picks its own public data sources (Wikidata, National Park Service, Google Maps search, web pages, Open-Meteo, Weather Service, OSRM) and ranks places with a fit verdict and a reason.
