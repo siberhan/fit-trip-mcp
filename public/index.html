@@ -1454,7 +1454,7 @@ let busy = false;
 function setBusy(b) { busy = b; for (const id of ["go", "q"]) $(id).disabled = b; for (const c of $("chips").children) c.disabled = b; }
 $("ask").onsubmit = (e) => { e.preventDefault(); const t = $("q").value.trim(); $("q").value = ""; if (t && !busy) ask(t); };
 
-const samples = ["Where can we go this Saturday?", "Is Muir Woods OK for us on Saturday?", "Somewhere with animals on Sunday afternoon?"];
+const samples = ["Where can we go this Saturday?", "Is the closest zoo a good fit for us?", "Somewhere with animals on Sunday afternoon?"];
 for (const label of samples) {
   const b = el("button", null, label); b.type = "button";
   b.onclick = () => { $("q").value = ""; ask(label); };
