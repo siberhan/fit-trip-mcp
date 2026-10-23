@@ -361,10 +361,8 @@ app.post("/api/stt", express.raw({ type: "audio/*", limit: "15mb" }), async (req
 
 // Text to speech. The model returns raw 16-bit PCM, which is passed straight on to the browser as it arrives,
 // so the first words play while the rest is still being made.
-// Groq's Orpheus is the voice. When Groq fails, OpenRouter's Grok voice takes over (a minute after a rate limit, a few otherwise),
-// so the voice does not switch back and forth between sentences and nobody waits on a dead provider.
-const VOICES = [
-  { model: "canopylabs/orpheus-v1-english", voice: process.env.TTS_VOICE || "hannah", groq: true, timeout: 5000 },
+// The voice is Grok on OpenRouter.
+const VOICES: { model: string; voice: string; timeout: number; groq?: boolean }[] = [
   { model: "x-ai/grok-voice-tts-1.0", voice: "eve", timeout: 6000 },
 ];
 let firstDownUntil = 0; // the first voice is skipped for a while after it fails
